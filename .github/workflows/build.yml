@@ -1,0 +1,19 @@
+name: Check PushBot
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node driver_station.test.cjs
+      - run: g++ -std=c++17 -Wall -Wextra -Werror -I. control_test.cpp -o /tmp/pushbot-tests && /tmp/pushbot-tests
+      - run: python -m pip install platformio==6.1.18
+      - run: pio run
