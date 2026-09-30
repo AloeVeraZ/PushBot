@@ -1,0 +1,6 @@
+.pio/
+.vscode/
+__pycache__/
+driver_station.h
+secrets.h
+
