@@ -2,66 +2,147 @@
 
 My old high-school robot, back off the floor.
 
-I originally built PushBot sometime around my freshman or sophomore year of high school. It broke, ended up sitting on my floor, and stayed there for a while. I decided to revive it instead of leaving it there.
+![PushBot: a 3D-printed six-wheel chassis with four yellow TT gear motors driving the wheels through printed gears, two red L298N motor drivers, and a Lonely Binary ESP32-S3 on its screw-terminal base](docs/pushbot.jpg)
 
-This repo is for my own robot: four small 5 V TT gear motors, a Lonely Binary ESP32-S3 on its screw-terminal breakout board, and two of the red L298N motor drivers. One driver handles the left pair of motors; the other handles the right pair. It's a simple tank-drive robot.
+I built PushBot around my freshman or sophomore year of high school. It broke,
+ended up on my floor, and stayed there for a while. This repo is the revival:
+new electronics and firmware so it can be driven from a phone again.
+
+## What PushBot is
+
+PushBot is a small **tank-drive robot**. A 3D-printed black chassis carries six
+grey wheels, three per side. Four yellow 5 V TT gear motors turn them through
+printed spur gears, two motors per side. Both wheels on a side always turn
+together, so it steers like a tank: both sides forward drives straight, and
+opposite directions spin it in place.
+
+The brain is a **Lonely Binary ESP32-S3 N16R8** (16 MB flash, 8 MB PSRAM) on
+Lonely Binary's **screw-terminal base**. Two red **L298N** dual H-bridge boards
+drive the motors, one for the left pair and one for the right pair. A 7 V
+battery powers the motors.
+
+## The goal
+
+Drive the robot from a phone browser with **nothing else**: no app, no
+computer, no internet, no cloud service. The ESP32 runs the robot and also
+serves the driver station web page itself. Open a web address and drive.
+
+It should also be **safe to hand to someone**. Driving needs a deliberate
+Enable, and any lost connection, lost focus, or missed command stops the
+motors.
+
+## What it does
+
+- **Phone driver station** built into the firmware, with two on-screen thumb
+  sticks. The left stick drives forward and back, and the right stick turns.
+  Use both for curves, or turn alone to spin in place. The thumb-stick code is
+  adapted from my [MotionModule](https://github.com/AloeVeraZ/MotionModule)
+  project.
+- **Also drivable** with a keyboard (WASD, Space to stop) or a game controller
+  on a laptop.
+- **Works on your home Wi-Fi or on its own.** Save a home network in the Wi-Fi
+  tab and PushBot joins it whenever it's in range, at http://pushbot.local/.
+  Away from home it makes its own **Pushbot** Wi-Fi network instead.
+- **Safety first:**
+  - Enable is deliberate, and only one driver can hold control.
+  - The robot starts at a 40% speed limit.
+  - A 500 ms watchdog in the firmware stops the motors if commands stop
+    arriving.
+  - Leaving the page, losing Wi-Fi, a cancelled touch, or rotating the phone
+    disables the robot.
+  - The motors ramp up smoothly instead of jerking.
+- **Status light:** the board's RGB LED shows what the robot is doing: blue or
+  green while waiting, colours for each drive direction, and red for faults.
 
 ## Driving it
 
-The robot program and the entire driver station live on the ESP32. There's no code editor, cloud service, app install, or internet connection involved in driving it.
+1. Lift the wheels for the first test, then power on PushBot.
+2. Connect a phone:
+   - **At home** (after saving your network once): stay on your home Wi-Fi and
+     open **http://pushbot.local/**, or the address shown in the Wi-Fi tab.
+   - **Anywhere else:** join the **Pushbot** Wi-Fi (password `pushbot-drive`),
+     tell the phone to stay connected without internet, and open
+     **http://192.168.4.1/**.
+3. Tick the safety box and press **Enable**.
+4. Drive with the two sticks. **Stop all outputs** stops everything
+   immediately.
 
-1. Power on PushBot and join **PushBot** Wi-Fi. The initial password is `floorbot-revival`.
-2. Stay connected if the phone says this network has no internet. Open **http://192.168.4.1/** in the browser.
-3. Tap **Enable drive**, then hold and slide each track control. Both forward goes forward; opposite directions turns in place. Let go to stop that track.
-4. **STOP & DISABLE** stops both tracks. The next drive needs another deliberate Enable.
+To save a home network: open the **Wi-Fi** tab, tap **Scan for networks**, pick
+your network (2.4 GHz only), enter its password, and tap **Save & connect**.
 
-The speed limit starts at 35%. Controls also accept up/down arrows while focused; space stops drive. Only one driver station can hold control. Closing it, losing Wi-Fi, hiding the page, or switching away disables drive. Reconnecting never automatically enables the robot.
+## Hardware
 
-The firmware cuts motor output after **350 ms without a valid drive command**, checked every 10 ms by a separate task even if networking stalls. Acceleration ramps up, direction changes pause at zero, and malformed commands disable drive. These are software protections, not a substitute for a reachable battery switch. The on-screen output numbers are commanded PWM counts, not measured wheel speed; there are no battery or motor sensors.
+| Part | Notes |
+|---|---|
+| Lonely Binary ESP32-S3 N16R8 + screw-terminal base | The controller and web server |
+| 2 × red L298N motor drivers | One per side; ENA/ENB jumpers stay **on** |
+| 4 × 5 V TT gear motors | Two per side, through printed gears to six wheels |
+| 7 V battery | Into each L298N's **12V** terminal; all grounds joined |
 
-## My hardware notes
+Motor wiring (ESP32 screw terminal → L298N input):
 
-Only the right-side terminals are accessible in the chassis. This is the fixed mapping in `config.h`:
+| Motor | IN1 | IN2 | ESP32 terminal block |
+|---|---:|---:|---|
+| Front left | GPIO 13 | GPIO 14 | Left |
+| Rear left | GPIO 11 | GPIO 12 | Left |
+| Front right | GPIO 1 | GPIO 2 | Right |
+| Rear right | GPIO 42 | GPIO 41 | Right |
 
-| ESP32 GPIO | L298N connection |
-| --- | --- |
-| 1 | Left IN1 and IN3 |
-| 2 | Left IN2 and IN4 |
-| 42 | Left ENA and ENB |
-| 41 | Right IN1 and IN3 |
-| 40 | Right IN2 and IN4 |
-| 47 | Right ENA and ENB |
+The right motors are inverted in software because they're mounted as a mirror
+image of the left ones. If a wheel spins the wrong way, flip its `INVERT_*`
+constant in the sketch. Don't swap wires.
 
-Each motor gets its own bridge: front motor on OUT1/OUT2, rear motor on OUT3/OUT4, for each side. Pairing the logic inputs makes those two bridges follow the same command. **Remove all ENA/ENB jumpers** before connecting the ESP32; add a 10 kΩ pull-down from each enable input to ground so the motors stay off during boot/reset. Match each motor's lead polarity so both wheels on a side drive in the same direction. `INVERT_LEFT` and `INVERT_RIGHT` reverse an entire side if needed.
+## Flashing
 
-The supplied pin list points to an **ESP32-S3**, not an original ESP32. Confirm that marking before flashing. GPIO19/20 are left available for native USB; GPIO48 and the uncertain “4” terminal are unused. GPIO39 is also unused. JTAG pins 40–42 are used as ordinary outputs; don't attach external JTAG to them while driving.
+The final firmware is [firmware/Pushbot](firmware/Pushbot). Open
+`Pushbot.ino` in Arduino IDE with the Espressif **esp32** board package
+(tested with 3.3.11). No extra libraries are needed. Use these **Tools**
+settings:
 
-### Power correction before running
+| Setting | Value |
+|---|---|
+| Board | ESP32S3 Dev Module |
+| USB CDC On Boot | Enabled |
+| USB Mode | Hardware CDC and JTAG |
+| Flash Size | 16MB (128Mb) |
+| Partition Scheme | 16M Flash (3MB APP/9.9MB FATFS) |
+| PSRAM | OPI PSRAM |
 
-My original idea was a 12 V battery straight into both L298Ns and the first driver's 5 V output powering the ESP32. **That isn't the power arrangement this code assumes.** The motors are 5 V: the L298N's voltage drop and a software speed limit do not turn a 12 V supply into a regulated motor supply.
+Then select the board's USB port and **Upload**. With the USB cable plugged in,
+a serial monitor at 115200 baud answers two read-only commands:
+- `?` prints the network, address and drive state.
+- `p` reads the actual level on all eight motor pins.
 
-Use the 12 V battery through a fuse and switch to a **5 V motor buck converter**, then feed that converter into both drivers' motor-supply terminals (often labeled `12V`). Size the converter, wiring and fuse for the motors' measured startup/stall current. At 5 V input the L298N drops appreciable voltage, so the robot may be slower; don't compensate by blindly raising the supply. A low-loss driver is a future improvement if torque is poor.
+## Known issues
 
-Use a **separate regulated 5 V buck supply** for the ESP32's 5V terminal and both drivers' 5V logic terminals. Remove both drivers' **5V-EN regulator jumpers** for this arrangement; those differ from ENA/ENB. Verify the actual module's labeling first. All grounds must join: battery negative, converter negatives, both drivers and ESP32. Keep motor return currents out of the ESP32 wiring. Don't join regulator outputs, and disconnect external ESP32 5 V power before connecting USB unless the board's power isolation has been verified.
+- **Battery-only power:** with USB unplugged, the board restarts when Wi-Fi
+  starts (magenta light). The 5 V that the L298N makes from a 7 V battery sags
+  under the Wi-Fi current. The firmware already uses low Wi-Fi power and a
+  slower CPU. The real fix is a **5 V buck converter** (2 A or more) from the
+  battery to the base's 5V/GND terminals, or a USB power bank in the board's
+  USB-C port.
+- **Motors not turning yet:** in the last test the motors didn't turn. The
+  `p` self-test showed every ESP32 motor pin switching correctly for forward
+  and reverse, so the code side works. What's left is the driver power
+  wiring:
+  - The battery + must go to each L298N's **12V** screw.
+  - Use real wire clamped under the screws, not jumper-wire pins.
+  - Check that the driver LEDs stay lit with USB unplugged.
+- An L298N loses about 2 V, so from 7 V the motors see roughly 5 V at full
+  output. The 40% starting speed limit may be too low to start them; raise
+  the slider.
 
-First run: wheels off the floor, speed low, check each side's direction, release the controls, press Stop, then disconnect the phone and verify the motors stop. Check driver temperature and motor current under load. Hardware operation still needs this bench check.
+## What's in this repo
 
-## Flashing my robot
+| Folder | What it is |
+|---|---|
+| [firmware/Pushbot](firmware/Pushbot) | **Final firmware** (Arduino IDE): robot control, driver station, Wi-Fi |
+| [testing](testing) | Development copy of the same firmware, its browser tests (`node testing/driver_station.test.cjs`), and a [detailed README](testing/README.md) covering wiring, power limits and the LED legend |
+| Repo root (`main.cpp`, `index.html`, `platformio.ini`, …) | My first revival attempt (PlatformIO, older pin map and power plan). Kept for reference; superseded by `firmware/Pushbot` |
 
-Open this folder in VS Code with PlatformIO, then use **Build** and **Upload**. Or, with PlatformIO installed:
+GitHub Actions still checks the original PlatformIO version, and also runs the
+final firmware's browser tests.
 
-```sh
-pio run
-pio run --target upload
-pio device monitor --baud 115200
-```
-
-The project pins the ESP32 platform and WebSockets library. It uses Arduino-ESP32 2.0.17 and a conservative ESP32-S3 DevKit configuration, using no PSRAM and fitting within 8 MB flash, including on a larger N16R8 board. The driver-station HTML is embedded automatically during build; no filesystem upload is needed. If upload doesn't connect, use the board's BOOT/RESET sequence and correct USB port/cable.
-
-To choose a personal Wi-Fi password, create ignored `secrets.h` with `#define PUSHBOT_WIFI_PASSWORD "your-password"` (8–63 characters) and rebuild. Pin changes and side reversal are in `config.h`; control behavior is in `main.cpp` and `control.h`; the station is `index.html`.
-
-## Checks
-
-`node driver_station.test.cjs` checks browser control behavior without hardware. `control_test.cpp` exercises the firmware's timeout, rollover, ramp and command parser with a host C++ compiler. GitHub Actions runs both checks and compiles the firmware. Physical motor behavior and the exact breakout-board revision still need checking on my robot.
-
-Hardware references: [Lonely Binary S3 pinout](https://learn.lonelybinary.com/pinouts/esp32-s3), [ST L298 datasheet](https://www.st.com/resource/en/datasheet/cd00000240.pdf), [typical red L298N module guide](https://www.handsontec.com/dataspecs/module/L298N%20Motor%20Driver.pdf). Module jumpers can vary.
+Hardware references: [Lonely Binary ESP32-S3 power](https://learn.lonelybinary.com/boards/esp32-s3/powering-the-board),
+[screw-terminal base pinout](https://learn.lonelybinary.com/pinouts/s3screw),
+[ST L298 datasheet](https://www.st.com/resource/en/datasheet/cd00000240.pdf).
