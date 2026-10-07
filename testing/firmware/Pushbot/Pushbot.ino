@@ -2,6 +2,7 @@
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp32-hal-rmt.h>
 
 #include "driver_station.h"
 
@@ -36,6 +37,16 @@ constexpr uint32_t COMMAND_TIMEOUT_MS = 350;
 constexpr float SLEW_PER_SECOND = 3.5f;  // 0 -> full output in about 0.29 seconds.
 constexpr float HARD_OUTPUT_LIMIT = 1.0f;
 
+// Lonely Binary ESP32-S3 N16R8: the on-board WS2812B is marked RGB@IO48.
+// The screw-terminal base passes this same GPIO through; keep it off motors.
+constexpr uint8_t STATUS_LED_PIN = 48;
+constexpr uint8_t STATUS_LED_BRIGHTNESS = 40;  // Out of 255.
+static_assert(STATUS_LED_PIN != FRONT_LEFT_IN1 && STATUS_LED_PIN != FRONT_LEFT_IN2 &&
+              STATUS_LED_PIN != REAR_LEFT_IN1 && STATUS_LED_PIN != REAR_LEFT_IN2 &&
+              STATUS_LED_PIN != FRONT_RIGHT_IN1 && STATUS_LED_PIN != FRONT_RIGHT_IN2 &&
+              STATUS_LED_PIN != REAR_RIGHT_IN1 && STATUS_LED_PIN != REAR_RIGHT_IN2,
+              "The RGB LED must not share a motor input GPIO");
+
 struct MotorPins {
   uint8_t in1;
   uint8_t in2;
@@ -59,6 +70,119 @@ float targetLeft = 0.0f;
 float targetRight = 0.0f;
 float actualLeft = 0.0f;
 float actualRight = 0.0f;
+bool accessPointReady = false;
+bool statusLedFault = false;
+bool statusLedStopFlash = false;
+uint32_t statusLedStopMs = 0;
+bool statusLedReady = false;
+// Async RMT needs a persistent buffer until its completion interrupt fires.
+rmt_data_t statusLedData[25];
+uint32_t lastWifiAttemptMs = 0;
+constexpr uint32_t WIFI_RETRY_MS = 3000;
+
+void showStatusColor(uint8_t red, uint8_t green, uint8_t blue, uint8_t brightness) {
+  // Never let the indicator hold up boot, networking, or motor timeouts.
+  if (!statusLedReady || !rmtTransmitCompleted(STATUS_LED_PIN)) return;
+  const uint8_t grb[] = {
+    static_cast<uint8_t>(green * brightness / 255),
+    static_cast<uint8_t>(red * brightness / 255),
+    static_cast<uint8_t>(blue * brightness / 255),
+  };
+  size_t index = 0;
+  for (uint8_t color : grb) {
+    for (int bit = 7; bit >= 0; --bit) {
+      const bool high = color & (1 << bit);
+      statusLedData[index].level0 = 1;
+      statusLedData[index].duration0 = high ? 8 : 4;
+      statusLedData[index].level1 = 0;
+      statusLedData[index].duration1 = high ? 4 : 8;
+      ++index;
+    }
+  }
+  // A 100 us low reset/latch at 10 MHz, after the 24 GRB bits.
+  statusLedData[24].level0 = statusLedData[24].level1 = 0;
+  statusLedData[24].duration0 = statusLedData[24].duration1 = 500;
+  rmtWriteAsync(STATUS_LED_PIN, statusLedData, 25);
+}
+
+void startAccessPoint() {
+  lastWifiAttemptMs = millis();
+  const IPAddress ip(192, 168, 4, 1);
+  const IPAddress subnet(255, 255, 255, 0);
+  accessPointReady = WiFi.mode(WIFI_AP);
+  if (accessPointReady) {
+    WiFi.setSleep(false);
+    accessPointReady = WiFi.softAPConfig(ip, ip, subnet) &&
+                       WiFi.softAP(AP_SSID, AP_PASSWORD, 6, false, 2);
+  }
+  if (accessPointReady) {
+    dnsServer.start(53, "*", ip);
+    server.begin();
+  }
+}
+
+void serviceUsbDiagnostics() {
+  // Only query/write a live USB console. No USB wait, flush, or boot logging.
+  if (!Serial || Serial.available() <= 0 || Serial.read() != '?') return;
+  char message[192];
+  const int count = snprintf(message, sizeof(message),
+      "Pushbot status: Wi-Fi=%s, armed=%s, left=%.3f, right=%.3f\n"
+      "ESP32-S3: flash=%u MB, PSRAM=%u MB, RGB=GPIO48\n",
+      accessPointReady ? "ready" : "failed", robotArmed ? "yes" : "no",
+      actualLeft, actualRight, ESP.getFlashChipSize() / (1024 * 1024),
+      ESP.getPsramSize() / (1024 * 1024));
+  if (count > 0 && count < static_cast<int>(sizeof(message)) &&
+      Serial.availableForWrite() >= count) {
+    Serial.write(reinterpret_cast<const uint8_t *>(message), count);
+  }
+}
+
+void updateStatusLed() {
+  // Animate with millis(), never delay() or wait for a whole flash cycle.
+  // Motor updates run first in loop(). The LED uses RMT, not motor PWM channels.
+  static uint32_t lastLedMs = 0;
+  const uint32_t now = millis();
+  if (now - lastLedMs < 40) return;
+  lastLedMs = now;
+
+  if (!accessPointReady || statusLedFault) {
+    // Two red flashes per second; faults stay visible until deliberate re-arm.
+    const uint32_t phase = now % 1000;
+    const bool on = phase < 120 || (phase >= 250 && phase < 370);
+    showStatusColor(255, 0, 0, on ? STATUS_LED_BRIGHTNESS : 0);
+    return;
+  }
+  if (statusLedStopFlash && now - statusLedStopMs >= 1200) {
+    statusLedStopFlash = false;
+  }
+  if (!robotArmed) {
+    if (statusLedStopFlash) {
+      const bool on = (now - statusLedStopMs) % 240 < 120;
+      showStatusColor(255, 0, 0, on ? STATUS_LED_BRIGHTNESS : 0);
+    } else {
+      // Slow blue breathing while disabled and waiting for a driver.
+      const uint32_t phase = now % 2400;
+      const uint32_t ramp = phase < 1200 ? phase : 2400 - phase;
+      showStatusColor(0, 60, 255, 6 + ramp * (STATUS_LED_BRIGHTNESS - 6) / 1200);
+    }
+    return;
+  }
+  if (fabsf(actualLeft) < 0.01f && fabsf(actualRight) < 0.01f) {
+    showStatusColor(255, 255, 255, STATUS_LED_BRIGHTNESS / 2);
+    return;
+  }
+
+  // Use the ramped output commands, so the light follows the commanded motion.
+  const uint8_t brightness = now % 500 < 300 ? STATUS_LED_BRIGHTNESS : 6;
+  if (fabsf(actualLeft - actualRight) > 0.08f) {
+    if (actualLeft > actualRight) showStatusColor(255, 100, 0, brightness);  // Right.
+    else showStatusColor(0, 255, 255, brightness);  // Left.
+  } else if (actualLeft + actualRight > 0.0f) {
+    showStatusColor(0, 255, 0, brightness);  // Forward.
+  } else {
+    showStatusColor(200, 0, 255, brightness);  // Reverse.
+  }
+}
 
 float clampPower(float value) {
   return constrain(value, -HARD_OUTPUT_LIMIT, HARD_OUTPUT_LIMIT);
@@ -93,6 +217,10 @@ void stopRobot(const String &reason) {
   actualLeft = actualRight = 0.0f;
   writeTank(0.0f, 0.0f);
   lastStopReason = reason;
+  if (reason == "Boot" || reason == "Enabled by driver") statusLedFault = false;
+  else if (reason == "Command watchdog expired" || reason == "Malformed drive command") statusLedFault = true;
+  statusLedStopFlash = reason == "Stopped by driver";
+  statusLedStopMs = millis();
 }
 
 float approach(float current, float target, float maximumStep) {
@@ -153,6 +281,10 @@ void sendStatus() {
 }
 
 void handleArm() {
+  if (!accessPointReady) {
+    sendJson(503, "{\"error\":\"Wi-Fi is not ready\"}");
+    return;
+  }
   const String client = server.arg("cid");
   if (server.arg("safe") != "1") {
     sendJson(400, "{\"error\":\"Safety confirmation is required\"}");
@@ -220,8 +352,6 @@ void setupRoutes() {
 }
 
 void setup() {
-  Serial.begin(115200);
-
   const MotorPins motors[] = {FRONT_LEFT, REAR_LEFT, FRONT_RIGHT, REAR_RIGHT};
   for (const MotorPins &motor : motors) {
     pinMode(motor.in1, OUTPUT);
@@ -230,31 +360,32 @@ void setup() {
     digitalWrite(motor.in2, LOW);
   }
   stopRobot("Boot");
-
-  WiFi.mode(WIFI_AP);
-  WiFi.setSleep(false);
-  const IPAddress ip(192, 168, 4, 1);
-  const IPAddress subnet(255, 255, 255, 0);
-  WiFi.softAPConfig(ip, ip, subnet);
-  if (!WiFi.softAP(AP_SSID, AP_PASSWORD, 6, false, 2)) {
-    Serial.println("Failed to start the Pushbot access point.");
-  }
-
-  dnsServer.start(53, "*", ip);
+  statusLedReady = rmtInit(STATUS_LED_PIN, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10000000);
+  showStatusColor(255, 140, 0, STATUS_LED_BRIGHTNESS);  // Amber during startup.
   setupRoutes();
-  server.begin();
+  startAccessPoint();
   lastRampMs = millis();
+  updateStatusLed();
 
-  Serial.println();
-  Serial.println("Pushbot driver station ready");
-  Serial.printf("Wi-Fi: %s\n", AP_SSID);
-  Serial.printf("Open: http://%s/\n", WiFi.softAPIP().toString().c_str());
+  // USB diagnostics are optional and initialized after the driver station.
+  Serial.begin(115200);
+#if ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT
+  Serial.setTxTimeoutMs(0);
+#endif
 }
 
 void loop() {
-  dnsServer.processNextRequest();
-  server.handleClient();
+  if (accessPointReady) {
+    dnsServer.processNextRequest();
+    server.handleClient();
+  } else if (millis() - lastWifiAttemptMs >= WIFI_RETRY_MS) {
+    stopRobot("Wi-Fi unavailable");
+    WiFi.softAPdisconnect(true);
+    startAccessPoint();
+  }
   updateMotorOutputs();
+  updateStatusLed();
+  serviceUsbDiagnostics();
   delay(1);
 }
 

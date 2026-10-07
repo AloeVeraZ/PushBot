@@ -73,6 +73,51 @@ module fitted to the base (for an N16R8 module: 16 MB flash, OPI PSRAM).
 Install the Espressif `esp32` board package if it is not already installed.
 No third-party libraries are needed.
 
+The tested upload target is the Lonely Binary **ESP32-S3 N16R8 Gold Edition**
+on its **Screw Terminal Base**. The base passes the dev board's GPIOs through;
+it does not contain a separate controller. The on-board WS2812B RGB LED is on
+**GPIO 48**, marked `RGB@IO48`, separate from all eight motor inputs.
+Manufacturer references: [board identification](https://learn.lonelybinary.com/boards/esp32-s3/what-you-are-holding)
+and [screw terminal pinout](https://learn.lonelybinary.com/pinouts/s3screw).
+
+Use 16 MB flash, OPI PSRAM, hardware CDC/JTAG USB mode and USB CDC on boot.
+For Arduino CLI with the Espressif board package installed:
+
+```powershell
+arduino-cli compile --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,CDCOnBoot=cdc" --build-path "$env:TEMP/pushbot-testing-build" testing/firmware/Pushbot
+arduino-cli upload --port COM11 --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,CDCOnBoot=cdc" --input-dir "$env:TEMP/pushbot-testing-build" testing/firmware/Pushbot
+```
+
+Run these commands from the repository root. Serial startup messages use
+115200 baud and report detected flash/PSRAM plus the LED legend.
+Send `?` in a USB serial monitor to request Wi-Fi readiness, armed state, tank
+output commands and memory sizes again. This diagnostic cannot arm or drive.
+If a native-USB upload/reset leaves the ROM saying `waiting for download`,
+release BOOT and press RESET once, or power-cycle the board. During the COM11
+upload, a software watchdog reset was used to leave download mode; the USB
+status query then confirmed Wi-Fi ready, 16 MB flash, 8 MB PSRAM, disabled
+drive and zero tank outputs.
+
+### RGB status light
+
+| Robot state | On-board LED |
+|---|---|
+| Starting Wi-Fi | Amber |
+| Disabled / waiting | Slowly breathing blue |
+| Enabled, outputs idle | White |
+| Forward output | Pulsing green |
+| Reverse output | Pulsing purple |
+| Left turn output | Pulsing cyan |
+| Right turn output | Pulsing amber |
+| Driver stop / disable | Red flashes for 1.2 seconds, then blue |
+| Watchdog, malformed command, or Wi-Fi startup failure | Repeating double red flashes |
+
+Watchdog and malformed-command indicators clear on a deliberate Enable (or
+reset); a Wi-Fi startup failure stays red until restart succeeds. Turn colors
+take priority over forward/reverse while the tank outputs differ. These colors
+reflect firmware output commands, not measured wheel movement. Animation uses
+`millis()` with no flash-cycle delays and runs after each motor update.
+
 Before uploading, change these constants near the top of `Pushbot.ino`:
 
 ```cpp
