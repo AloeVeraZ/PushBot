@@ -48,7 +48,7 @@ function harness(){
   };
   const context=vm.createContext({document,navigator:{getGamepads:()=>pads,sendBeacon(path){requests.push({path,beacon:true});Object.assign(state,{armed:false,owner:false})}},
     addEventListener(n,fn){windowEvents[n]=fn},fetch,URLSearchParams,AbortController,console,crypto:{randomUUID:()=> 'test-client-123'},
-    setInterval(fn,ms){intervals.push({fn,ms})},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)}});
+    setInterval(fn,ms){intervals.push({fn,ms});return intervals.length},clearInterval(){},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)}});
   vm.runInContext(source,context);
   return {element,dispatch,state,requests,delayed,windowEvents,documentEvents,document,
     value:expression=>vm.runInContext(expression,context),
@@ -101,6 +101,13 @@ function harness(){
   await h.arm();h.document.hidden=true;h.documentEvents.visibilitychange();await settle();assert.equal(h.state.armed,false);h.document.hidden=false;
   await h.arm();h.windowEvents.blur();await settle();assert.equal(h.state.armed,false);
   await h.arm();h.windowEvents.resize();await settle();assert.equal(h.state.armed,false);
+  // Opening the Wi-Fi page disables the robot and locks driving until Drive is reopened.
+  await h.arm();await h.dispatch('wifiTab','click');await settle();assert.equal(h.state.armed,false);assert.equal(h.value('canDrive()'),false);
+  assert.equal(h.element('drivePage').hidden,true);assert.equal(h.element('wifiPage').hidden,false);
+  await h.dispatch('driveTab','click');await settle();assert.equal(h.element('drivePage').hidden,false);
+  // A space typed into a text field (a Wi-Fi password) is not the Stop shortcut.
+  await h.arm();h.windowEvents.keydown({key:' ',target:{tagName:'INPUT',type:'password'},preventDefault(){}});await settle();assert.equal(h.state.armed,true);
+  h.windowEvents.keydown({key:' ',preventDefault(){}});await settle();assert.equal(h.state.armed,false);
 
   // Deflected gamepad waits for neutral after Enable, then right means right.
   const g=harness();await settle();g.pads([{index:0,id:'test pad',axes:[0,-1,0],buttons:[]}]);await g.arm();await g.tick();assert.deepEqual(g.drive(),[0,0]);
@@ -112,5 +119,5 @@ function harness(){
   g.pads([]);await g.arm();g.delayNext('/api/drive');const pending=g.tick();await settle();g.expireRequests();await pending;await settle();assert.equal(g.value('canDrive()'),false);
   Object.assign(g.state,{armed:true,owner:true});await g.poll();assert.equal(g.value('canDrive()'),false);
   g.windowEvents.pagehide();assert.equal(g.requests.at(-1).beacon,true);assert.equal(g.value('canDrive()'),false);
-  console.log('PASS: neutral arming, two-thumb arcs/pivots/reverse, release, multi-touch ownership, cancellation/capture loss, stop latch, stale replies, visibility/blur, gamepad neutral gate, steering signs, timeout and reconnect');
+  console.log('PASS: neutral arming, two-thumb arcs/pivots/reverse, release, multi-touch ownership, cancellation/capture loss, stop latch, stale replies, visibility/blur, gamepad neutral gate, steering signs, timeout and reconnect, Wi-Fi page lockout, typing in fields');
 })().catch(error=>{console.error(error);process.exitCode=1});

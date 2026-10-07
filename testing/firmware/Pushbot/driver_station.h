@@ -23,10 +23,17 @@ static const char DRIVER_STATION_HTML[] PROGMEM = R"PUSHBOT_HTML(
 .touch-drive{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stick-zone{display:grid;gap:8px;min-width:0}.stick-pad{position:relative;display:grid;place-items:center;min-height:180px;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--well);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}.stick-pad.held{cursor:grabbing}.stick-base{display:grid;place-items:center;width:min(120px,calc(100% - 12px));aspect-ratio:1;border:1px solid #435264;border-radius:50%;background:linear-gradient(#435264,#435264) center/1px 100% no-repeat,linear-gradient(#435264,#435264) center/100% 1px no-repeat,#182330;box-shadow:inset 0 2px 12px #0005;transition:transform .15s}.stick-pad[data-axes="y"] .stick-base{width:54px;height:156px;aspect-ratio:auto;border-radius:999px}.stick-pad[data-axes="x"] .stick-base{width:calc(100% - 12px);height:54px;aspect-ratio:auto;border-radius:999px}.stick-knob{width:42px;height:42px;border:1px solid #6a829b;border-radius:50%;background:#35475b;box-shadow:0 6px 14px #0007;transition:transform .12s,background-color .12s;pointer-events:none}.stick-pad.held .stick-base,.stick-pad.held .stick-knob{transition:none}.stick-pad.held .stick-knob{background:var(--cyan);border-color:transparent;box-shadow:0 0 18px #53d2e855}.touch-drive.locked .stick-base{opacity:.45}.touch-drive.locked .stick-pad::after{content:"Enable to drive";position:absolute;bottom:10px;color:var(--faint);font-size:10px;pointer-events:none}.stick-caption{display:grid;gap:3px;text-align:center}.stick-caption strong{font-size:11px;text-transform:uppercase;letter-spacing:.08em}.stick-caption output{color:var(--muted);font:11px ui-monospace,monospace}.stick-pad:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 @media(max-width:700px){.controls{grid-row:1}.center{grid-row:2}.stick-pad{min-height:186px}.keys{display:none}.drive-stage{min-height:260px}}
 @media(hover:none) and (pointer:coarse){.keys{display:none}}
+.tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--well)}.tab{min-height:36px;padding:0 14px;border:0;border-radius:7px;background:none;color:var(--muted);font-weight:800;letter-spacing:.05em;cursor:pointer}.tab.active{background:#222d39;color:var(--text);box-shadow:inset 0 0 0 1px #3a4a5c}.tab:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+[hidden]{display:none!important}.wifi-page{max-width:720px;margin:auto;padding:18px;display:grid;gap:14px}.wifi-result{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--well);color:var(--muted);font-size:12px;line-height:1.45}.net-list{display:grid;gap:6px;max-height:280px;overflow:auto}.net-list:empty{display:none}.net{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:#1a2430;text-align:left;cursor:pointer}.net.selected{border-color:var(--cyan);background:#173442}.net span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}.net small{flex:none;color:var(--muted);font:11px ui-monospace,monospace}.field{display:grid;gap:6px;color:var(--muted);font-size:12px}.field input{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:var(--well);color:var(--text);font-size:16px}.field input:focus{outline:2px solid var(--cyan);outline-offset:1px}.wifi-page .metric strong{overflow-wrap:anywhere;text-align:right}
+@media(max-width:700px){.brand small{display:none}.brand strong{font-size:14px}.tab{padding:0 10px}.wifi-page{padding:10px}}@media(max-width:400px){.brand strong{display:none}}
+/* Phones: unwrap the control panels so Stop and both sticks share one screen. */
+@media(max-width:700px),(orientation:landscape) and (max-height:540px){.controls,.controls .panel,.controls .body,.touch-drive{display:contents}.controls .panel-head,.controller,.axis{display:none}.grid>.center,.grid>.right,.hint{grid-column:1/-1;grid-row:auto}}
+@media(max-width:700px){.grid{grid-template-columns:1fr 1fr;gap:10px}.state,.check,.pair,.range,.stop{grid-column:1/-1}}
+@media(orientation:landscape) and (max-height:540px){.header{height:46px}.mark{width:32px;height:32px;font-size:17px}.brand small,.chip,.signals{display:none}.grid{grid-template-columns:minmax(0,1fr) minmax(220px,280px) minmax(0,1fr);gap:8px;padding:8px max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left))}.state,.check,.pair,.range,.stop{grid-column:2}.state{padding:8px}.state strong{font-size:18px}.keys{display:none}.stick-zone{grid-row:1/span 5;grid-template-rows:1fr auto;align-self:stretch}.stick-zone:first-child{grid-column:1}.stick-zone:last-child{grid-column:3}.stick-pad{min-height:170px}}
 </style>
 </head>
 <body>
-<header class="header"><div class="brand"><div class="mark">P</div><div><strong>Pushbot Driver Station</strong><small>ESP32 tank drive</small></div></div><div class="chip"><small>Robot address</small><strong>192.168.4.1</strong></div></header>
+<header class="header"><div class="brand"><div class="mark">P</div><div><strong>Pushbot Driver Station</strong><small>ESP32 tank drive</small></div></div><nav class="tabs" aria-label="Pages"><button class="tab active" id="driveTab" aria-pressed="true">Drive</button><button class="tab" id="wifiTab" aria-pressed="false">Wi-Fi</button></nav><div class="chip"><small>Robot address</small><strong id="robotAddress">192.168.4.1</strong></div></header>
 <div class="signals">
   <div class="signal" id="sigComms"><i></i><small>Communications</small><strong>Connecting</strong></div>
   <div class="signal" id="sigRobot"><i></i><small>Robot</small><strong>Unknown</strong></div>
@@ -34,9 +41,9 @@ static const char DRIVER_STATION_HTML[] PROGMEM = R"PUSHBOT_HTML(
   <div class="signal" id="sigOutput"><i></i><small>Outputs</small><strong>Stopped</strong></div>
 </div>
 <div class="lost" id="lost"><strong>Robot connection lost.</strong> Motors have been commanded to stop. Reconnect and arm again.</div>
-<main class="grid">
+<main class="grid" id="drivePage">
   <aside class="column controls">
-    <section class="panel"><div class="panel-head"><h2>Robot control</h2><span>350 ms watchdog</span></div><div class="body stack">
+    <section class="panel"><div class="panel-head"><h2>Robot control</h2><span>500 ms watchdog</span></div><div class="body stack">
       <div class="state" id="robotState"><strong>DISABLED</strong><small>Drive commands are blocked</small></div>
       <label class="check"><input id="safe" type="checkbox"><span>The robot is raised or the driving area is clear, and the motor-power cutoff is within reach.</span></label>
       <div class="pair"><button class="command enable" id="arm" disabled>ENABLE</button><button class="command disable" id="disarm">DISABLE</button></div>
@@ -63,10 +70,28 @@ static const char DRIVER_STATION_HTML[] PROGMEM = R"PUSHBOT_HTML(
   </div>
   <aside class="column right">
     <section class="panel"><div class="panel-head"><h2>System</h2><span>LIVE</span></div><div class="body">
-      <div class="metric"><span>Wi-Fi clients</span><strong id="clients">—</strong></div><div class="metric"><span>Command age</span><strong id="age">—</strong></div><div class="metric"><span>ESP32 uptime</span><strong id="uptime">—</strong></div><div class="metric"><span>Last stop reason</span><strong id="reason">Boot</strong></div>
+      <div class="metric"><span>Wi-Fi clients</span><strong id="clients">—</strong></div><div class="metric"><span>Command age</span><strong id="age">—</strong></div><div class="metric"><span>ESP32 uptime</span><strong id="uptime">—</strong></div><div class="metric"><span>Last stop reason</span><strong id="reason">Boot</strong></div><div class="metric"><span>Last reset</span><strong id="reset">—</strong></div>
     </div></section>
     <section class="panel"><div class="panel-head"><h2>Safe operation</h2><span>READ FIRST</span></div><div class="body"><ul class="safety"><li>Test with the wheels raised before placing the robot on the floor.</li><li>Keep a physical motor-power switch or battery disconnect reachable.</li><li>Never power motors from the ESP32. Join only the logic grounds.</li><li>If a side runs backward, change its inversion constants in the sketch.</li></ul></div></section>
   </aside>
+</main>
+<main class="wifi-page" id="wifiPage" hidden>
+  <section class="panel"><div class="panel-head"><h2>Connection</h2><span id="wifiState">—</span></div><div class="body stack">
+    <div class="metric"><span>Connected through</span><strong id="wifiVia">—</strong></div>
+    <div class="metric"><span>Open the driver station at</span><strong id="wifiAddress">—</strong></div>
+    <div class="metric"><span>Saved home network</span><strong id="wifiSaved">None</strong></div>
+    <p class="wifi-result" id="wifiResult" role="status">—</p>
+  </div></section>
+  <section class="panel"><div class="panel-head"><h2>Join a network</h2><span>2.4 GHz only</span></div><div class="body stack">
+    <button class="command" id="wifiScan">SCAN FOR NETWORKS</button>
+    <div class="net-list" id="wifiList" role="list" aria-label="Networks Pushbot can see"></div>
+    <label class="field">Network name<input id="wifiSsid" type="text" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+    <label class="field">Password<input id="wifiPassword" type="password" maxlength="63" autocomplete="off"></label>
+    <label class="check"><input id="wifiShow" type="checkbox"><span>Show password</span></label>
+    <div class="pair"><button class="command enable" id="wifiSave">SAVE &amp; CONNECT</button><button class="command disable" id="wifiForget">FORGET</button></div>
+    <p class="hint" id="wifiMessage" role="status"></p>
+    <p class="hint">Pushbot saves one home network. It joins it at power-on when it is in range, and looks for it again every minute while no one is using its own hotspot. If it can't join, it starts the <strong>Pushbot</strong> hotspot (password pushbot-drive) at http://192.168.4.1/. On the home network, open http://pushbot.local/ or the address above. Opening this page disables the robot.</p>
+  </div></section>
 </main>
 <div class="footer">Pushbot · local control only · no internet connection required</div>
 <script>
@@ -105,8 +130,6 @@ function createTouchStick(pad, { enabled, change }) {
     if (released !== null) {
       try { pad.releasePointerCapture?.(released); } catch (_) { /* already released */ }
     }
-    origin = null;
-    pad.classList.remove('held');
     base.style.transform = '';
     knob.style.transform = '';
     report({ x: 0, y: 0 });
@@ -186,11 +209,12 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const cid=(globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now().toString(36)).slice(0,48);
 const held=new Set(), sticks={}, stickMoving={left:false,right:false};
 let connected=false, armed=false, owner=false, inFlight=false, queued=false, padIndex=null, lastPadButtons=[];
-let pendingStop=false, arming=false, driveAuthorized=false, epoch=0, awaitingNeutral=true, touchSelected=false, suppressInput=false;
+let pendingStop=false, arming=false, driveAuthorized=false, epoch=0, awaitingNeutral=true, touchSelected=false, suppressInput=false, wifiPageOpen=false, wifiTimer=null;
 let command={left:0,right:0,throttle:0,turn:0,source:'Ready'};
 const clamp=(v,a=-1,b=1)=>Math.max(a,Math.min(b,v));
 const dead=v=>!Number.isFinite(v)||Math.abs(v)<.12?0:Math.sign(v)*(Math.abs(v)-.12)/.88;
-const canDrive=()=>connected&&armed&&owner&&driveAuthorized&&!pendingStop&&!arming;
+const canDrive=()=>connected&&armed&&owner&&driveAuthorized&&!pendingStop&&!arming&&!wifiPageOpen;
+const typingInField=e=>{const t=e.target;return !!t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&!['checkbox','range','button'].includes(t.type)))};
 function signal(id,state,text){const el=$(id);el.className='signal '+state;el.querySelector('strong').textContent=text}
 function form(data){return new URLSearchParams(data).toString()}
 async function request(path,options={}){
@@ -256,7 +280,7 @@ function applyStatus(s){
   connected=true;armed=!!s.armed;owner=!!s.owner;
   if(!armed){pendingStop=false;driveAuthorized=false}
   if(!owner)driveAuthorized=false;
-  $('#lost').classList.remove('show');signal('#sigComms','good','Connected');$('#clients').textContent=s.clients;$('#age').textContent=s.armed?`${s.commandAgeMs} ms`:'—';$('#uptime').textContent=`${Math.floor(s.uptimeMs/60000)}m ${Math.floor(s.uptimeMs/1000)%60}s`;$('#reason').textContent=s.reason||'—';
+  $('#lost').classList.remove('show');signal('#sigComms','good','Connected');$('#clients').textContent=s.clients;$('#age').textContent=s.armed?`${s.commandAgeMs} ms`:'—';$('#uptime').textContent=`${Math.floor(s.uptimeMs/60000)}m ${Math.floor(s.uptimeMs/1000)%60}s`;$('#reason').textContent=s.reason||'—';$('#reset').textContent=s.reset||'—';
   if(!canDrive())clearInputs();updateArmUi();paintCommand();
 }
 async function pollStatus(){const token=epoch;try{const s=await request(`/api/status?cid=${encodeURIComponent(cid)}`);if(token===epoch&&!arming)applyStatus(s)}catch(_){if(token===epoch)showDisconnected()}}
@@ -280,10 +304,71 @@ for(const side of ['left','right']){
   pad.addEventListener('keyup',event=>{const key=keyMap[event.key];if(!key)return;event.preventDefault();held.delete(key);paintKeys();readInput();sendDrive()});
 }
 $('#safe').addEventListener('change',updateArmUi);$('#arm').addEventListener('click',armRobot);$('#disarm').addEventListener('click',stopRobot);$('#estop').addEventListener('click',emergencyStop);$('#speed').addEventListener('input',()=>{$('#speedOut').textContent=$('#speed').value+'%';readInput();sendDrive()});
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k===' '){e.preventDefault();emergencyStop();return}if(!['w','a','s','d'].includes(k)||e.repeat||!canDrive()||['INPUT','BUTTON'].includes(document.activeElement.tagName))return;e.preventDefault();clearTouchInputs();touchSelected=false;held.add(k);paintKeys();readInput();sendDrive()});
+addEventListener('keydown',e=>{if(typingInField(e))return;const k=e.key.toLowerCase();if(k===' '){e.preventDefault();emergencyStop();return}if(!['w','a','s','d'].includes(k)||e.repeat||!canDrive()||['INPUT','BUTTON'].includes(document.activeElement.tagName))return;e.preventDefault();clearTouchInputs();touchSelected=false;held.add(k);paintKeys();readInput();sendDrive()});
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(!['w','a','s','d'].includes(k))return;held.delete(k);paintKeys();readInput();sendDrive()});
 addEventListener('blur',emergencyStop);addEventListener('pagehide',()=>{++epoch;driveAuthorized=false;armed=false;owner=false;clearInputs();navigator.sendBeacon('/api/stop')});document.addEventListener('visibilitychange',()=>{if(document.hidden)emergencyStop()});addEventListener('gamepaddisconnected',()=>{padIndex=null;emergencyStop()});addEventListener('gamepadconnected',()=>{if(!$('#leftStickPad').classList.contains('held')&&!$('#rightStickPad').classList.contains('held'))touchSelected=false});
 addEventListener('resize',()=>{if(canDrive())emergencyStop();else clearInputs()});
+// Wi-Fi page: pick and save the home network. Opening it disables the robot.
+function wifiMessage(text){$('#wifiMessage').textContent=text}
+function paintWifi(w){
+  const states={home:'HOME WI-FI',hotspot:'HOTSPOT',joining:'JOINING',failed:'WI-FI FAILED',starting:'STARTING'};
+  $('#wifiState').textContent=states[w.state]||String(w.state||'—').toUpperCase();
+  $('#wifiVia').textContent=w.state==='home'?`${w.saved} (${w.rssi} dBm)`:w.hotspot?`${w.hotspotName} hotspot`:'—';
+  const addresses=[];if(w.ip)addresses.push(`http://${w.ip}/`,`http://${w.hostname}/`);if(w.hotspot)addresses.push(`http://${w.hotspotIp}/ on ${w.hotspotName}`);
+  $('#wifiAddress').textContent=addresses.join('  ·  ')||'—';
+  $('#wifiSaved').textContent=w.saved||'None';$('#wifiResult').textContent=w.result||'—';
+  if(!$('#wifiSsid').value&&w.saved&&document.activeElement!==$('#wifiSsid'))$('#wifiSsid').value=w.saved;
+}
+async function loadWifi(){try{paintWifi(await request('/api/wifi'))}catch(_){$('#wifiResult').textContent='Pushbot is not reachable right now. If it just changed networks, join that network and open its address.'}}
+function showPage(page){
+  wifiPageOpen=page==='wifi';
+  if(wifiPageOpen&&(armed||arming))stopRobot();
+  clearInputs();updateArmUi();
+  $('#drivePage').hidden=wifiPageOpen;$('#wifiPage').hidden=!wifiPageOpen;
+  for(const [id,on] of [['#driveTab',!wifiPageOpen],['#wifiTab',wifiPageOpen]]){$(id).classList.toggle('active',on);$(id).setAttribute('aria-pressed',String(on))}
+  clearInterval(wifiTimer);wifiTimer=null;
+  if(wifiPageOpen){loadWifi();wifiTimer=setInterval(loadWifi,2000)}
+}
+const signalBars=rssi=>rssi>=-55?'▂▄▆█':rssi>=-67?'▂▄▆':rssi>=-78?'▂▄':'▂';
+function renderNetworks(list){
+  const box=$('#wifiList');box.replaceChildren();
+  for(const n of list){
+    const b=document.createElement('button'),name=document.createElement('span'),info=document.createElement('small');
+    b.type='button';b.className='net';b.setAttribute('role','listitem');name.textContent=n.ssid;info.textContent=`${n.secure?'🔒 ':''}${signalBars(n.rssi)} ${n.rssi} dBm`;b.append(name,info);
+    b.addEventListener('click',()=>{box.querySelectorAll('.net').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');$('#wifiSsid').value=n.ssid;$('#wifiPassword').value='';if(n.secure){$('#wifiPassword').focus();wifiMessage(`Enter the password for ${n.ssid}.`)}else wifiMessage('Open network: no password needed.')});
+    box.append(b);
+  }
+}
+async function scanWifi(){
+  const button=$('#wifiScan');if(button.disabled)return;button.disabled=true;wifiMessage('Scanning… the Pushbot hotspot may pause for a few seconds.');
+  try{
+    await post('/api/wifi/scan');
+    for(let i=0;i<30;i++){
+      await new Promise(resolve=>setTimeout(resolve,700));
+      let out;try{out=await request('/api/wifi/networks')}catch(_){continue}
+      if(!out.scanning){const list=out.networks||[];renderNetworks(list);wifiMessage(list.length?'Tap your network, then enter its password.':'No networks found. Pushbot can only see 2.4 GHz networks.');return}
+    }
+    wifiMessage('The scan took too long. Try again.');
+  }catch(e){wifiMessage(e.message)}
+  finally{button.disabled=false}
+}
+async function saveWifi(){
+  const ssid=$('#wifiSsid').value,password=$('#wifiPassword').value;
+  if(!ssid.trim()){wifiMessage('Choose or type a network name.');return}
+  if(password&&(password.length<8||password.length>63)){wifiMessage('Wi-Fi passwords are 8 to 63 characters.');return}
+  $('#wifiSave').disabled=true;
+  try{const w=await post('/api/wifi/save',{ssid,password});$('#wifiPassword').value='';paintWifi(w);wifiMessage(`Saved. Pushbot is joining ${ssid}. If it connects, its address appears above and the Pushbot hotspot stays on for one more minute. Then join ${ssid} on this device and open that address.`)}
+  catch(e){wifiMessage(e.message)}
+  finally{$('#wifiSave').disabled=false}
+}
+async function forgetWifi(){
+  if(!confirm('Forget the saved network? Pushbot will use only its own hotspot.'))return;
+  try{paintWifi(await post('/api/wifi/forget'));$('#wifiSsid').value='';wifiMessage('Forgotten. Pushbot now uses its own hotspot. Join Pushbot to reconnect.')}catch(e){wifiMessage(e.message)}
+}
+$('#driveTab').addEventListener('click',()=>showPage('drive'));$('#wifiTab').addEventListener('click',()=>showPage('wifi'));
+$('#wifiScan').addEventListener('click',scanWifi);$('#wifiSave').addEventListener('click',saveWifi);$('#wifiForget').addEventListener('click',forgetWifi);
+$('#wifiShow').addEventListener('change',()=>{$('#wifiPassword').type=$('#wifiShow').checked?'text':'password'});
+if(globalThis.location?.host)$('#robotAddress').textContent=location.host;
 setInterval(()=>{readInput();sendDrive()},50);setInterval(pollStatus,300);updateArmUi();readInput();pollStatus();
 </script>
 </body>
