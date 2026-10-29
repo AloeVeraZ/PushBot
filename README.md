@@ -2,7 +2,7 @@
 
 My old high-school robot, back off the floor.
 
-![PushBot: a 3D-printed six-wheel chassis with four yellow TT gear motors driving the wheels through printed gears, two red L298N motor drivers, and a Lonely Binary ESP32-S3 on its screw-terminal base](docs/pushbot.jpg)
+<picture><img src="docs/pushbot.jpg" alt="PushBot: a 3D-printed six-wheel chassis with four yellow TT gear motors driving the wheels through printed gears, two red L298N motor drivers, and a Lonely Binary ESP32-S3 on its screw-terminal base"></picture>
 
 I built PushBot around my freshman or sophomore year of high school. It broke,
 ended up on my floor, and stayed there for a while. This repo is the revival:
